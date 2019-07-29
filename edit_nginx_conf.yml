@@ -15,7 +15,7 @@
       force: yes
       mode: 0755
     with_items:
-      - { src: 'nginx01/nginx.conf', dst: '/etc/nginx/nginx.conf' }
+      - { src: 'nginx/nginx.conf', dst: '/etc/nginx/nginx.conf' }
 
   - name: Restart Nginx
     become: yes
