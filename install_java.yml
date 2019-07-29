@@ -1,0 +1,35 @@
+---
+- name: jenkins_slave
+  hosts: jenkins_slave
+  vars: 
+    username: jenkins
+
+  tasks:
+  - name: install java
+    yum: 
+      name: java-1.8.0-openjdk
+
+  - name: Add the user "{{ username }}"
+    user:
+      name: "{{ username }}"
+      comment: jenkisn_slave
+      generate_ssh_key: yes
+      ssh_key_bits: 2048
+      ssh_key_file: .ssh/id_rsa
+      shell: /bin/bash
+      create_home: yes
+
+  - name:
+    authorized_key:
+      user: "{{ username }}"
+      state: present
+      key: "{{ lookup('file', 'jenkins/id_rsa.pub') }}"
+
+
+  - name: Change file ownership, group and permissions
+    file:
+      path: /jenslave
+      owner: "{{ username }}"
+      group: "{{ username }}"
+      mode: '0755'
+      state: directory

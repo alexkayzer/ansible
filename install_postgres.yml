@@ -1,0 +1,146 @@
+---
+- name: Install POSTGRES
+  hosts: postgres_servers
+  vars:
+    postgres_version: postgresql-11.4
+    postgres_tarball_url: "https://ftp.postgresql.org/pub/source/v11.4/{{ postgres_version }}.tar.gz"
+    postgres_install_dir: "/tmp/{{ postgres_version }}"
+    postgres_init_dir: "/usr/local/pgsql/data/"
+    postgres_user: "postgres"
+
+
+  tasks:
+  - name: Install POSTGRES Depends Debian
+    apt:
+      name:  "{{ item }}"
+      update_cache: yes
+    loop:
+      - zlib1g-dev
+      - build-essential
+      - aptitude
+      - libssl-dev
+      - python3-dev
+      - libreadline7 
+      - libreadline-dev
+      - openssl
+      - sudo
+    when: ansible_os_family == "Debian"
+
+  - name: Install POSTGRES Depends Centos
+    yum:
+     name:  "{{ item }}"
+    loop:
+      - openssl-devel
+      - pcre-devel
+      - redhat-rpm-config
+      - gcc
+      - readline-devel
+      - libffi-devel
+      - python-devel
+      - openssl
+      - sudo
+    when: ansible_os_family == "RedHat"
+
+  - name: install the 'Development tools' package group
+    yum:
+      name: "@Development tools"
+      state: present
+    when: ansible_os_family == "RedHat"
+
+  - name: Downloading POSTGRES sources
+    get_url:
+      url: "{{ postgres_tarball_url }}"
+      dest: "/tmp/{{ postgres_version }}.tar.gz"
+    register: postgres_source
+
+  - name: Unpacking POSTGRES
+    unarchive:
+      copy: no
+      dest: /tmp/
+      src: "/tmp/{{ postgres_version }}.tar.gz"
+    register: postgres_source_unpack
+
+  - name: Configuring POSTGRES source with custom modules
+    command: "./configure --prefix=/usr/local/ --with-openssl"
+    args:
+      chdir: "{{ postgres_install_dir }}"
+#    when: postgres_source_unpack is changed
+    register: postgres_configure
+
+  - name: Installing POSTGRES
+    shell: make && make install
+    args:
+      chdir: "{{ postgres_install_dir }}"
+    when: postgres_configure is changed
+
+  - name: Add the user 'postgres'
+    user:
+      name: "{{ postgres_user }}"
+      ssh_key_bits: 2048
+      ssh_key_file: .ssh/id_rsa
+      comment: Postgres User
+      shell: /bin/bash
+
+  - name: Set authorized key for user postgres copying it from current user
+    authorized_key:
+      user: "{{ postgres_user }}"
+      state: present
+      key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}"
+
+  - name: Create a directory if it does not exist
+    file:
+      path: "{{ postgres_init_dir }}"
+      state: directory
+      mode: '0755'
+      recurse: yes
+      owner: "{{ postgres_user }}"
+      group: "{{ postgres_user }}"
+
+  - name: Ensure PostgreSQL database is initialized.
+    command: "initdb -D {{ postgres_init_dir }}"
+    become: true
+    become_user: "{{ postgres_user }}"
+#      - /etc/ssl/crt/
+#      - /etc/ssl/private/
+#      - /etc/ssl/csr/
+#
+#  - name: Copy configs
+#    copy:
+#      src: "{{ item.src }}"
+#      dest: "{{ item.dst }}"
+#      force: yes
+#      mode: 0755
+#    with_items:
+#      - { src: '/home/ansible/ansible/postgres/postgres_test.conf', dst: '/etc/postgres/postgres.conf' }
+#      - { src: '/home/ansible/ansible/postgres/postgres.service', dst: '/lib/systemd/system/postgres.service' }
+#      - { src: '/home/ansible/ansible/postgres/index.html', dst: '/sites/index.html' }
+#
+#  - name: Delete HTTPD
+#    yum:
+#      name: [ 'httpd', 'firewalld' ]
+#      state: removed
+#    when: ansible_os_family == "RedHat"
+#
+##  - name: Generate a Self Signed OpenSSL certificate
+##    openssl_certificate:
+##      path: /etc/ssl/crt/ansible.com.crt
+##      privatekey_path: /etc/ssl/private/ansible.com.pem
+##      csr_path: /etc/ssl/csr/ansible.com.csr
+##      provider: selfsigned
+#
+#      
+#  - name: Starting POSTGRES
+#    become: yes
+#    service:
+#      name: postgres.service
+#      state: restarted
+#      enabled: yes
+#
+#  - name: iptables flush filter
+#    iptables:
+#      chain: "{{ item }}"
+#      flush: yes
+#    loop:  
+#      - INPUT
+#      - FORWARD
+#      - OUTPUT

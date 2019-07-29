@@ -1,0 +1,26 @@
+---
+- name: Edit nginx configs
+  hosts: nginx_servers
+  vars:
+#    nginx_version: nginx-1.17.1
+#    nginx_tarball_url: "http://nginx.org/download/{{ nginx_version }}.tar.gz"
+#    nginx_install_dir: "/tmp/{{ nginx_version }}"
+
+  tasks:
+
+  - name: Copy configs
+    copy:
+      src: "{{ item.src }}"
+      dest: "{{ item.dst }}"
+      force: yes
+      mode: 0755
+    with_items:
+      - { src: 'nginx01/nginx.conf', dst: '/etc/nginx/nginx.conf' }
+
+  - name: Restart Nginx
+    become: yes
+    service:
+      name: "{{ item }}"
+      state: restarted
+    loop: 
+      - nginx.service

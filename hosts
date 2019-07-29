@@ -1,0 +1,37 @@
+[proxmox]
+pve01 ansible_host=192.168.90.2
+
+[nginx_servers]
+nginx01  ansible_host=192.168.90.4
+
+[postgres_servers]
+
+[jenkins_servers]
+jenkins01 ansible_host=192.168.90.6
+
+[jenkins_slave]
+jen_slave01 ansible_host=192.168.90.5
+
+[linux_servers:children]
+postgres_servers
+nginx_servers
+jenkins_servers
+jenkins_slave
+proxmox
+
+
+[linux_servers:vars]
+ansible_user=root
+ansible_private_key_file=id_rsa/id_rsa
+
+#[windows]
+#windows10 ansible_host=192.168.90.94 
+#windows2016 ansible_host=192.168.90.93 
+
+#[windows:vars]
+#ansible_user=admin
+#ansible_password=P@ssw0rd
+#ansible_port=5986
+#ansible_connection=winrm
+#ansible_winrm_server_cert_validation=ignore
+#ansible_winrm_transport=ssl

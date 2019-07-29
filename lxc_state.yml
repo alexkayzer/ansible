@@ -1,0 +1,32 @@
+---
+- name: stop lxc
+  hosts: proxmox
+  vars:
+    api_pass: "W@rcraft"
+#  vars_prompt: 
+#    - name: lxc_vmid
+#      prompt: please enter the lxc vmid
+#      private: no
+#
+#    - name: lxc_pass
+#      prompt: please enter the target host root passsword
+#      private: yes
+#
+#    - name: lxc_ip
+#      prompt: please enter the target host ip
+#      private: no
+#
+#    - name: api_pass
+#      prompt: please enter the proxmox password
+#      private: yes
+
+  tasks:
+  - name: stop lxc 
+    proxmox:
+      node: pve01
+      vmid: "{{ lxc_vmid }}"
+      api_user: root@pam
+      api_password: "{{ api_pass }}"
+      api_host: "{{ ansible_host }}"
+      force: yes
+      state: "{{ lxc_state }}" 

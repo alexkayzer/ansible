@@ -1,0 +1,132 @@
+---
+- name: Install NGINX
+  hosts: nginx_servers
+  vars:
+    nginx_version: nginx-1.17.1
+    nginx_tarball_url: "http://nginx.org/download/{{ nginx_version }}.tar.gz"
+    nginx_install_dir: "/tmp/{{ nginx_version }}"
+
+
+  tasks:
+  - name: Install NGINX Depends Debian
+    apt:
+      name:  "{{ item }}"
+      update_cache: yes
+    loop:
+      - libssl-dev
+      - zlib1g-dev
+      - libpcre3
+      - libpcre3-dev
+      - build-essential
+      - aptitude
+      - libssl-dev
+      - libffi-dev
+      - python3-dev
+      - nfs-kernel-server
+    when: ansible_os_family == "Debian"
+
+  - name: Install NGINX Depends Centos
+    yum:
+     name:  "{{ item }}"
+    loop:
+      - openssl-devel
+      - redhat-rpm-config
+      - gcc
+      - libffi-devel
+      - python-devel
+      - openssl-devel
+      - nfs-utils
+      - php-fpm
+    when: ansible_os_family == "RedHat"
+
+  - name: install the 'Development tools' package group
+    yum:
+      name: "@Development tools"
+      state: present
+    when: ansible_os_family == "RedHat"
+
+  - name: Downloading NGINX sources
+    get_url:
+      url: "{{ nginx_tarball_url }}"
+      dest: "/tmp/{{ nginx_version }}.tar.gz"
+    register: nginx_source
+
+  - name: Unpacking NGINX
+    unarchive:
+      copy: no
+      dest: /tmp/
+      src: "/tmp/{{ nginx_version }}.tar.gz"
+    register: nginx_source_unpack
+
+  - name: Configuring NGINX source with custom modules
+    command: "./configure --prefix=/etc/nginx/ --sbin-path=/usr/sbin/nginx --conf-path=/etc/nginx/nginx.conf --with-http_ssl_module --with-pcre --with-http_mp4_module" 
+    args:
+      chdir: "{{ nginx_install_dir }}"
+    when: nginx_source_unpack is changed
+    register: nginx_configure
+
+  - name: Installing NGINX
+    shell: make && make install
+    args:
+      chdir: "{{ nginx_install_dir }}"
+    when: nginx_configure is changed
+
+  - name: Create a directory if it does not exist
+    file:
+      path: "{{ item }}"
+      state: directory
+      mode: '0755'
+    loop: 
+      - /var/log/nginx/
+      - /sites/
+      - /mults/
+      - /video/
+      - /etc/ssl/crt/
+      - /etc/ssl/key/
+
+  - name: Copy configs
+    copy:
+      src: "{{ item.src }}"
+      dest: "{{ item.dst }}"
+      force: yes
+      mode: 0755
+    with_items:
+      - { src: 'nginx01/nginx.conf', dst: '/etc/nginx/nginx.conf' }
+      - { src: 'nginx01/nginx.service', dst: '/lib/systemd/system/nginx.service' }
+      - { src: 'nginx01/index.php', dst: '/sites/index.php' }
+      - { src: 'nginx01/web01.crt', dst: '/etc/ssl/crt/web01.crt' }
+      - { src: 'nginx01/web01.key', dst: '/etc/ssl/key/web01.key' }
+
+  - name: Delete HTTPD
+    yum:
+      name: [ 'httpd', 'firewalld' ]
+      state: removed
+    when: ansible_os_family == "RedHat"
+
+  - name: Starting services
+    become: yes
+    service:
+      name: "{{ item }}"
+      state: restarted
+      enabled: yes
+    loop: 
+      - nginx.service
+      - php-fpm
+      - rpcbind
+
+  - name: mount share
+    mount:
+      path: /video
+      src: 192.168.90.3:/i-data/59c4b60d/nfs/mults 
+      fstype: nfs
+      opts: defaults
+      state: present
+
+  - name: iptables flush filter
+    iptables:
+      chain: "{{ item }}"
+      flush: yes
+    loop:  
+      - INPUT
+      - FORWARD
+      - OUTPUT
